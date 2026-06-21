@@ -1,0 +1,14 @@
+# Rust build output
+/target
+**/*.rs.bk
+
+# Study notes (Obsidian) — local only, same convention as Bedrock
+notas/
+
+# macOS
+.DS_Store
+
+# Datasets (downloaded for benchmarks; large, not committed)
+/datasets
+*.fvecs
+*.ivecs
