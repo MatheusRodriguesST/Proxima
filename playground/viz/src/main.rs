@@ -1,23 +1,22 @@
 //! Interactive 2D visualizer for the Proxima engine.
 //!
-//! Drives the real `proxima-index` (insert / remove / search) and renders the
-//! result as a force-directed graph: k-NN edges act as springs, all nodes repel,
-//! so the layout settles into a computed arrangement and animates as it changes.
-//! The on-screen layout shows structure, not exact coordinates; the distances
-//! reported in a search are the engine's, computed by the chosen metric.
+//! Drives the real `proxima-index` (insert / update / remove / search). A node's
+//! on-screen position **is** its vector, so "nearest on screen" matches the
+//! engine's nearest exactly; moving a node updates its value. The motion is a
+//! smooth glide toward each node's coordinate — purely cosmetic, never changing
+//! the data.
 //!
 //! Controls:
 //!
 //! ```text
-//! A                   add a node at the cursor (animates into the layout)
-//! right click         run a k-NN search from the cursor
-//! left drag node      grab and move a node
+//! P                   run a k-NN search from the cursor
+//! A                   add a node at the cursor
+//! left drag node      move a node (updates its vector)
 //! left drag empty     pan
 //! wheel               zoom to cursor
 //! Delete / Backspace  remove the selected node
 //! + / -               neighbors per node, k
 //! M                   toggle metric (L2 / cosine)
-//! Space               pause / resume the layout
 //! Esc                 clear search / selection
 //! R                   reset the view
 //! ```
@@ -29,15 +28,8 @@ use proxima_core::{Cosine, Vector, L2};
 use proxima_index::{BruteForceIndex, Neighbor};
 use std::collections::{BTreeSet, HashMap};
 
-// Layout physics (world units ≈ pixels at zoom 1).
-const REPULSION: f32 = 11000.0;
-const SPRING_K: f32 = 0.06;
-const SPRING_REST: f32 = 130.0;
-const CENTER_PULL: f32 = 0.012;
-const DAMPING: f32 = 0.86;
-const MAX_SPEED: f32 = 700.0;
-const MAX_FORCE: f32 = 4000.0;
-const NODE_RADIUS: f32 = 17.0;
+const LERP_SPEED: f32 = 9.0;
+const NODE_RADIUS: f32 = 18.0;
 
 fn window_conf() -> Conf {
     Conf {
@@ -52,8 +44,8 @@ fn window_conf() -> Conf {
 struct VNode {
     id: u64,
     label: String,
-    pos: Vec2,
-    vel: Vec2,
+    pos: Vec2,    // drawn position, glides toward `target`
+    target: Vec2, // the node's vector (its value), in world space
     radius: f32,
     component: usize,
 }
@@ -72,7 +64,6 @@ struct App {
     components: usize,
     k: usize,
     use_cosine: bool,
-    paused: bool,
     dirty: bool,
     cam_offset: Vec2,
     zoom: f32,
@@ -90,9 +81,8 @@ impl App {
             nodes: Vec::new(),
             edges: Vec::new(),
             components: 0,
-            k: 2,
+            k: 3,
             use_cosine: false,
-            paused: false,
             dirty: true,
             cam_offset: vec2(screen_width() * 0.5, screen_height() * 0.5),
             zoom: 1.0,
@@ -102,20 +92,37 @@ impl App {
             last_mouse: Vec2::ZERO,
             search: None,
         };
-        // Seed three loose clusters so the window opens with something alive.
-        let seed = [
-            ("Bedrock", -260.0, -120.0),
-            ("WAL", -320.0, -60.0),
-            ("LSM-Tree", -200.0, -70.0),
-            ("Cargo", 250.0, -130.0),
-            ("Ownership", 320.0, -70.0),
-            ("Trait", 200.0, -80.0),
-            ("HNSW", 0.0, 170.0),
-            ("Cosine", -70.0, 220.0),
-            ("Recall", 80.0, 220.0),
+        // A small interconnected vocabulary: words grouped by meaning, the way an
+        // embedding model would place them. Each cluster forms its own connected
+        // component (its own color) under small k.
+        let vocab = [
+            ("cat", -300.0, -150.0),
+            ("dog", -225.0, -160.0),
+            ("lion", -310.0, -85.0),
+            ("tiger", -230.0, -90.0),
+            ("wolf", -270.0, -35.0),
+            ("apple", 300.0, -150.0),
+            ("banana", 225.0, -160.0),
+            ("grape", 310.0, -85.0),
+            ("orange", 230.0, -90.0),
+            ("lemon", 270.0, -35.0),
+            ("rust", -300.0, 150.0),
+            ("vector", -225.0, 160.0),
+            ("index", -310.0, 215.0),
+            ("search", -230.0, 220.0),
+            ("graph", -270.0, 265.0),
+            ("star", 300.0, 150.0),
+            ("orbit", 225.0, 160.0),
+            ("galaxy", 310.0, 215.0),
+            ("comet", 230.0, 220.0),
+            ("nebula", 270.0, 265.0),
         ];
-        for (label, x, y) in seed {
+        for (label, x, y) in vocab {
             app.add_node(vec2(x, y), label.to_string());
+        }
+        // Bloom intro: start everyone at the center and let them glide outward.
+        for node in &mut app.nodes {
+            node.pos = Vec2::ZERO;
         }
         app
     }
@@ -134,7 +141,7 @@ impl App {
             id,
             label,
             pos: world,
-            vel: Vec2::ZERO,
+            target: world,
             radius: 0.0,
             component: 0,
         });
@@ -255,8 +262,13 @@ impl App {
         }
         if is_mouse_button_down(MouseButton::Left) {
             if let Some(i) = self.dragging {
-                self.nodes[i].pos = self.to_world(mouse);
-                self.nodes[i].vel = Vec2::ZERO;
+                // A node's position is its value: moving it updates the vector.
+                let world = self.to_world(mouse);
+                self.nodes[i].pos = world;
+                self.nodes[i].target = world;
+                self.index
+                    .update(self.nodes[i].id, Vector::from([world.x, world.y]));
+                self.dirty = true;
             } else if self.panning {
                 self.cam_offset += mouse - self.last_mouse;
             }
@@ -265,10 +277,10 @@ impl App {
             self.dragging = None;
             self.panning = false;
         }
-        if is_mouse_button_pressed(MouseButton::Right) {
+
+        if is_key_pressed(KeyCode::P) {
             self.run_search(self.to_world(mouse));
         }
-
         if is_key_pressed(KeyCode::A) {
             let label = format!("v{}", self.nodes.len());
             self.add_node(self.to_world(mouse), label);
@@ -289,9 +301,6 @@ impl App {
             self.dirty = true;
             self.search = None;
         }
-        if is_key_pressed(KeyCode::Space) {
-            self.paused = !self.paused;
-        }
         if is_key_pressed(KeyCode::Escape) {
             self.search = None;
             self.selected = None;
@@ -304,55 +313,16 @@ impl App {
         self.last_mouse = mouse;
     }
 
-    fn step_physics(&mut self, dt: f32) {
-        let n = self.nodes.len();
-        let mut forces = vec![Vec2::ZERO; n];
-
-        for i in 0..n {
-            for j in (i + 1)..n {
-                let delta = self.nodes[i].pos - self.nodes[j].pos;
-                let dist = delta.length().max(1.0);
-                let f = (delta / dist) * (REPULSION / (dist * dist)).min(MAX_FORCE);
-                forces[i] += f;
-                forces[j] -= f;
-            }
-        }
-        for &(a, b) in &self.edges {
-            let delta = self.nodes[b].pos - self.nodes[a].pos;
-            let dist = delta.length().max(1.0);
-            let f = (delta / dist) * (dist - SPRING_REST) * SPRING_K;
-            forces[a] += f;
-            forces[b] -= f;
-        }
-        for (force, node) in forces.iter_mut().zip(&self.nodes) {
-            *force += -node.pos * CENTER_PULL;
-        }
-
-        let dragging = self.dragging;
-        for (i, (node, force)) in self.nodes.iter_mut().zip(&forces).enumerate() {
-            if dragging == Some(i) {
-                continue;
-            }
-            let mut v = (node.vel + *force * dt) * DAMPING;
-            if v.length() > MAX_SPEED {
-                v = v.normalize_or_zero() * MAX_SPEED;
-            }
-            node.vel = v;
-            node.pos += v * dt;
-        }
-    }
-
     fn update(&mut self) {
         let dt = get_frame_time().min(1.0 / 30.0);
         self.handle_input();
         if self.dirty {
             self.rebuild();
         }
+        let t = (dt * LERP_SPEED).min(1.0);
         for node in &mut self.nodes {
-            node.radius += (NODE_RADIUS - node.radius) * (dt * 8.0).min(1.0);
-        }
-        if !self.paused {
-            self.step_physics(dt);
+            node.pos += (node.target - node.pos) * t;
+            node.radius += (NODE_RADIUS - node.radius) * t;
         }
         if let Some(s) = &mut self.search {
             s.age += dt;
@@ -383,10 +353,8 @@ impl App {
             let color = component_color(node.component);
             let p = self.to_screen(node.pos);
             let r = node.radius * self.zoom;
-            // glow
             draw_circle(p.x, p.y, r * 2.1, with_alpha(color, 0.05));
             draw_circle(p.x, p.y, r * 1.45, with_alpha(color, 0.10));
-            // core
             draw_circle(p.x, p.y, r, color);
             let rim = if self.selected == Some(i) {
                 Color::new(1.0, 1.0, 1.0, 0.95)
@@ -394,7 +362,6 @@ impl App {
                 Color::new(1.0, 1.0, 1.0, 0.35)
             };
             draw_circle_lines(p.x, p.y, r, 2.0, rim);
-            // label
             let fs = 15.0;
             let d = measure_text(&node.label, None, fs as u16, 1.0);
             draw_text(
@@ -469,22 +436,18 @@ impl App {
                 self.components
             ),
             format!(
-                "k: {}    metric: {}",
+                "k: {}    metric: {}    fps: {}",
                 self.k,
-                if self.use_cosine { "cosine" } else { "L2" }
-            ),
-            format!(
-                "{}    fps: {}",
-                if self.paused { "PAUSED" } else { "running" },
+                if self.use_cosine { "cosine" } else { "L2" },
                 get_fps()
             ),
-            "A add · right-click search · drag move/pan".to_string(),
-            "Del remove · +/- k · M metric · Space pause · R reset".to_string(),
+            "P search · A add · drag move/pan".to_string(),
+            "Del remove · +/- k · M metric · R reset".to_string(),
         ];
         draw_rectangle(
             12.0,
             12.0,
-            430.0,
+            420.0,
             18.0 * lines.len() as f32 + 14.0,
             Color::new(0.08, 0.09, 0.12, 0.78),
         );
@@ -512,10 +475,16 @@ impl App {
             ),
         ];
         for (rank, nb) in s.results.iter().enumerate() {
+            let label = self
+                .nodes
+                .iter()
+                .find(|n| n.id == nb.id)
+                .map(|n| n.label.as_str())
+                .unwrap_or("?");
             lines.push(format!(
-                "#{}  id {}  ·  d = {:.4}",
+                "#{}  {}  ·  d = {:.4}",
                 rank + 1,
-                nb.id,
+                label,
                 nb.distance
             ));
         }

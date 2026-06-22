@@ -5,16 +5,20 @@ Proxima stores high-dimensional embeddings and answers *k*-nearest-neighbor quer
 the K vectors most similar to this one" — the backbone of RAG, semantic search, recommendation,
 and agent memory.
 
-It is the successor to **[Bedrock](https://github.com/MatheusRodriguesST/Bedrock)** (a durable
-storage engine), built in the same spirit: **learning systems by implementing them**, now in the
-domain that backend work values most — AI infrastructure. Under the hood a vector database *is* a
-database, so Proxima reuses Bedrock as its durable persistence layer and adds the new, hard part on
-top: the ANN index.
+This is the third project in my systems portfolio and the successor to
+**[Bedrock](https://github.com/MatheusRodriguesST/Bedrock)**, a durable storage engine. I build
+these to sharpen my craft the only way that sticks: **learning systems by implementing them** — and
+this time in the domain backend work values most, AI infrastructure. A vector database *is* a
+database underneath, so Proxima reuses Bedrock as its durable persistence layer and builds the new,
+hard part on top: the ANN index. That continuity is deliberate — first I built the storage, now I
+build the engine that searches it.
 
-> **Status: early development.** This repository is currently scaffolding only — no engine code yet.
-> The plan, the design decisions, and the step-by-step roadmap live in [`ROADMAP.md`](ROADMAP.md)
-> and `CLAUDE.md`. Nothing below is implemented; this README states the *goal*, and will grow into
-> honest, measured documentation (with real recall/latency numbers) as each step lands.
+## The name
+
+**Proxima**, from the Latin *proximus*, "the nearest" — which is exactly what nearest-neighbor
+search computes: of all the vectors I hold, the ones closest to yours. The word also points at
+*Proxima Centauri*, the nearest star to our own. Same idea at two scales — the closest point in a
+space, whether that space has three dimensions or three hundred.
 
 ## The plan, in one paragraph
 
@@ -24,13 +28,27 @@ definition, which makes it the honest baseline to measure against. Then build th
 the trade-off every vector database lives on — **recall vs latency vs memory** — measured, plotted,
 and compared against a reference (FAISS / hnswlib) on a standard dataset, never just asserted.
 
+## Status
+
+Early, but no longer empty. Honest snapshot of what actually runs today:
+
+- ✅ **`crates/core`** — `Vector` type and distance metrics (L2, cosine), with closed-form tests.
+- ✅ **`crates/index`** — `BruteForceIndex`: exact kNN over a `BinaryHeap`. This is the recall = 1.0
+  oracle the approximate index will be measured against (FAISS calls this a "Flat" index).
+- ✅ **`playground/viz`** — an interactive, animated graph visualizer that drives the real engine:
+  add points, run a search, watch the O(N) scan and the *k* nearest light up with real distances.
+- ⏳ **Next** — persistence via Bedrock, then the HNSW graph itself.
+
+No recall-vs-latency numbers exist yet, because there is no approximate index yet. When there is,
+this README will state real measured numbers with their conditions — never "it's fast" on its own.
+
 ## Planned architecture
 
 - **`crates/core`** — `Vector`, distance metrics (L2, cosine), and the vector store.
 - **`crates/index`** — the ANN index: brute-force first, then HNSW.
 - **`crates/server`** — an HTTP API, hand-rolled over `std::net` (same no-framework stance as Bedrock).
 - **`crates/bench`** — a recall×latency harness and dataset loaders (SIFT / GloVe).
-- **`playground/viz`** — a future 3D graph visualizer (late step; isolated from the core).
+- **`playground/viz`** — an interactive graph visualizer (will grow to 3D in a late step).
 
 Vectors are persisted durably via Bedrock; the HNSW index lives in memory for fast search and is
 rebuilt/recovered from the durable store — disk is for durability and cold start, not the hot path.
@@ -46,6 +64,8 @@ The same four deliverables that finished Bedrock, adapted to a vector database:
 3. **README explaining decisions and trade-offs** — why HNSW over IVF/LSH/kd-tree, why the layered
    graph works, the recall×latency×memory trade-off, and the engine's honest limits.
 4. **CI** — build + tests + clippy + fmt on every push; ideally the recall benchmark as a regression gate.
+
+The detailed step-by-step plan lives in [`ROADMAP.md`](ROADMAP.md).
 
 ## Reference
 

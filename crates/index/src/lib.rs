@@ -50,6 +50,16 @@ impl BruteForceIndex {
         }
     }
 
+    /// Replace the vector stored under `id`. Returns whether it existed.
+    pub fn update(&mut self, id: u64, vector: Vector) -> bool {
+        if let Some(entry) = self.entries.iter_mut().find(|(i, _)| *i == id) {
+            entry.1 = vector;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -173,6 +183,16 @@ mod tests {
     fn k_zero_returns_empty() {
         let (idx, _) = build();
         assert!(idx.search(&L2, &[0.0, 0.0], 0).is_empty());
+    }
+
+    #[test]
+    fn update_moves_the_vector() {
+        let (mut idx, ids) = build();
+        assert!(idx.update(ids[2], Vector::from([0.5, 0.0]))); // move (5,0) -> (0.5,0)
+        let res = idx.search(&L2, &[0.0, 0.0], 2);
+        assert_eq!(res[0].id, ids[0]); // (0,0)
+        assert_eq!(res[1].id, ids[2]); // now (0.5,0), closer than (1,0)
+        assert!(!idx.update(99, Vector::from([0.0, 0.0]))); // unknown id
     }
 
     #[test]
