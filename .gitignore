@@ -12,3 +12,6 @@ notas/
 /datasets
 *.fvecs
 *.ivecs
+
+# AI collaboration guide — local only
+CLAUDE.md
