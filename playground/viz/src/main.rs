@@ -44,8 +44,9 @@ fn window_conf() -> Conf {
 struct VNode {
     id: u64,
     label: String,
-    pos: Vec2,    // drawn position, glides toward `target`
-    target: Vec2, // the node's vector (its value), in world space
+    pos: Vec2,
+    target: Vec2, // the node's vector; `pos` glides toward it
+
     radius: f32,
     component: usize,
 }
@@ -92,9 +93,7 @@ impl App {
             last_mouse: Vec2::ZERO,
             search: None,
         };
-        // A small interconnected vocabulary: words grouped by meaning, the way an
-        // embedding model would place them. Each cluster forms its own connected
-        // component (its own color) under small k.
+        // Words grouped by meaning, as an embedding model would place them.
         let vocab = [
             ("cat", -300.0, -150.0),
             ("dog", -225.0, -160.0),
@@ -386,7 +385,6 @@ impl App {
             let p = self.to_screen(node.pos);
             draw_line(q.x, q.y, p.x, p.y, 1.0, Color::new(0.5, 0.55, 0.65, 0.08));
         }
-        // bright animated lines to the k nearest
         let pulse = 0.5 + 0.5 * (s.age * 5.0).sin();
         for (rank, nb) in s.results.iter().enumerate() {
             if let Some(node) = self.nodes.iter().find(|n| n.id == nb.id) {
