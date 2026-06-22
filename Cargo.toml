@@ -2,5 +2,7 @@
 resolver = "2"
 members = [
     "crates/core",
-    # crates/index, crates/server, crates/bench join at their roadmap steps (see ROADMAP.md).
+    "crates/index",
+    "playground/viz",
+    # crates/server, crates/bench join at their roadmap steps (see ROADMAP.md).
 ]

@@ -1,0 +1,14 @@
+[package]
+name = "proxima-viz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Interactive playground for the engine, isolated from it. It drives the real
+# proxima-index (add / remove / search) and renders the result; it never
+# implements engine logic. The visuals grow as the engine grows.
+
+[dependencies]
+proxima-core = { path = "../../crates/core" }
+proxima-index = { path = "../../crates/index" }
+macroquad = "0.4"
