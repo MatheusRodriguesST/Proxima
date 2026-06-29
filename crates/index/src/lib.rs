@@ -9,6 +9,9 @@ use proxima_core::{Metric, Vector};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
+pub mod nsw;
+pub use nsw::NswIndex;
+
 /// A search result: the id of a stored vector and its distance to the query.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Neighbor {
