@@ -6,3 +6,11 @@ members = [
     "playground/viz",
     # crates/server, crates/bench join at their roadmap steps (see ROADMAP.md).
 ]
+
+# Shared package metadata; crates inherit with `key.workspace = true`.
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/MatheusRodriguesST/Proxima"
+authors = ["Matheus Rodrigues"]

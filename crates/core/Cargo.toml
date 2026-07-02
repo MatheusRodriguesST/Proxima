@@ -1,6 +1,10 @@
 [package]
 name = "proxima-core"
-version = "0.1.0"
-edition = "2021"
+description = "Core types for the Proxima vector database: dense f32 vectors and distance metrics (L2, cosine)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
 
 [dependencies]

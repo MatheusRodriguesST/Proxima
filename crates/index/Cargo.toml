@@ -1,7 +1,11 @@
 [package]
 name = "proxima-index"
-version = "0.1.0"
-edition = "2021"
+description = "ANN indexes for the Proxima vector database: exact brute-force kNN oracle and the NSW/HNSW graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
 
 [dependencies]
 proxima-core = { path = "../core" }
