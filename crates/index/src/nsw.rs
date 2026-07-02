@@ -5,7 +5,6 @@ use proxima_core::Vector;
 struct Node {
     id: u64,
     vector: Vector,
-    #[allow(dead_code)]
     neighbors: Vec<usize>,
 }
 
@@ -47,10 +46,14 @@ impl NswIndex {
         self.next_id += 1;
 
         let index = self.nodes.len();
+        let neighbors: Vec<usize> = (0..index).collect();
+        for existing in &mut self.nodes {
+            existing.neighbors.push(index);
+        }
         self.nodes.push(Node {
             id,
             vector,
-            neighbors: Vec::new(),
+            neighbors,
         });
 
         if self.entry.is_none() {
@@ -88,5 +91,28 @@ mod tests {
         let id = idx.insert(Vector::from([3.0, 4.0]));
         assert_eq!(idx.get(id), Some(&Vector::from([3.0, 4.0])));
         assert_eq!(idx.get(999), None);
+    }
+
+    #[test]
+    fn first_node_has_no_neighbors() {
+        let mut idx = NswIndex::new(4, 16);
+        idx.insert(Vector::from([0.0, 0.0]));
+        assert!(idx.nodes[0].neighbors.is_empty());
+    }
+
+    #[test]
+    fn insert_builds_a_complete_graph() {
+        let mut idx = NswIndex::new(4, 16);
+        idx.insert(Vector::from([0.0, 0.0]));
+        idx.insert(Vector::from([1.0, 0.0]));
+        idx.insert(Vector::from([2.0, 0.0]));
+
+        // K3: every node is linked to the other two.
+        for node in &idx.nodes {
+            assert_eq!(node.neighbors.len(), 2);
+        }
+        // Edges are bidirectional.
+        assert!(idx.nodes[0].neighbors.contains(&2));
+        assert!(idx.nodes[2].neighbors.contains(&0));
     }
 }
