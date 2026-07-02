@@ -163,17 +163,23 @@ Conceitos: por que PQ é o que torna bilhões de vetores viáveis; o trade-off c
 
 ## FASE D — Vitrine (só depois do core "pronto")
 
-### Degrau 10 — Visualizador 3D do grafo
-**Limitação que resolve:** nenhuma técnica — é apelo visual e prova de entendimento. Mas só vale
-depois que recall/latência/FAISS-baseline estiverem feitos.
+### Degrau 10 — Visualizador HNSW interativo standalone (Rust→WASM)
+**Limitação que resolve:** nenhuma técnica — é apelo visual, prova de entendimento e projeto para a
+comunidade (estrelas). Mas só vale depois que recall/latência/FAISS-baseline estiverem feitos.
 
-O que construir: projetar os vetores de alta dimensão para 3D (PCA ou UMAP), renderizar o grafo HNSW
-em camadas (Three.js no `playground/viz`, isolado do core em Rust), e **animar uma query** descendo
-as camadas. Mostra visualmente as "rodovias→ruas→endereço".
+O que construir: extrair o visualizador do `playground/viz` num projeto standalone que roda no
+navegador (Rust → WASM via `macroquad`, que já compila para WASM). Insere pontos, roda uma busca e
+assiste o algoritmo navegar o grafo — descida pelas camadas, feixe `ef` expandindo, candidatos
+descartados, recall mudando ao vivo com `M`/`ef_search`. Demo de um clique via GitHub Pages.
+
+Por quê esse projeto: ferramentas educacionais visuais interativas são ímãs de estrela comprovados
+(build-your-own-x), custo marginal baixo (motor de viz e integração com o índice real já existem),
+e divulga o portfólio inteiro. Companheiro natural: as notas de estudo do projeto, traduzidas em
+inglês como série escrita, com o visualizador ilustrando cada conceito.
 
 > [!warning]
-> Isto é vitrine, não substância. Não comece antes do #1–#4 da definição de pronto. Um 3D lindo sobre
-> um índice sem recall medido não engana um revisor técnico.
+> Isto é vitrine, não substância. Não comece antes do #1–#4 da definição de pronto. Um visualizador
+> lindo sobre um índice sem recall medido não engana um revisor técnico.
 
 ---
 
@@ -190,7 +196,7 @@ as camadas. Mostra visualmente as "rodovias→ruas→endereço".
 | 7 | API HTTP | ser só uma lib | C |
 | 8 | Concorrência | um cliente por vez | C |
 | 9 | Quantização (opcional) | RAM faminta do HNSW | C |
-| 10 | Visualizador 3D | (vitrine, não técnica) | D |
+| 10 | Visualizador HNSW standalone (Rust→WASM) | (vitrine, não técnica) | D |
 
 ## Ordem de prioridade para "pronto que impressiona"
 Degraus **1→6 são o núcleo inegociável** — é o que prova que você entende ANN de verdade (o degrau 6,
