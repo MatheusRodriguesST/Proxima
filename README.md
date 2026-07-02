@@ -9,8 +9,8 @@ This is the third project in my systems portfolio and the successor to
 **[Bedrock](https://github.com/MatheusRodriguesST/Bedrock)**, a durable storage engine. I build
 these to sharpen my craft the only way that sticks: **learning systems by implementing them** — and
 this time in the domain backend work values most, AI infrastructure. A vector database *is* a
-database underneath, so Proxima reuses Bedrock as its durable persistence layer and builds the new,
-hard part on top: the ANN index. That continuity is deliberate — first I built the storage, now I
+database underneath, so Proxima will reuse Bedrock as its durable persistence layer and builds the
+new, hard part on top: the ANN index. That continuity is deliberate — first I built the storage, now I
 build the engine that searches it.
 
 ## The name
@@ -37,7 +37,8 @@ Early, but no longer empty. Honest snapshot of what actually runs today:
   oracle the approximate index will be measured against (FAISS calls this a "Flat" index).
 - ✅ **`playground/viz`** — an interactive, animated graph visualizer that drives the real engine:
   add points, run a search, watch the O(N) scan and the *k* nearest light up with real distances.
-- ⏳ **Next** — persistence via Bedrock, then the HNSW graph itself.
+- 🔨 **In progress** — the NSW graph (the single-layer step toward HNSW), built in verifiable
+  stages against the brute-force oracle. Persistence via Bedrock comes after the graph works.
 
 No recall-vs-latency numbers exist yet, because there is no approximate index yet. When there is,
 this README will state real measured numbers with their conditions — never "it's fast" on its own.
@@ -76,4 +77,4 @@ The detailed step-by-step plan lives in [`ROADMAP.md`](ROADMAP.md).
 
 ## License
 
-TBD.
+MIT — see [LICENSE](LICENSE).
